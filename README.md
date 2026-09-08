@@ -26,6 +26,10 @@ The database (`server/store.db`) is created and seeded automatically on first se
 | `admin`  | `admin123`| admin | Rp 1.000.000 |
 | `user`   | `user123` | user  | Rp 50.000    |
 
+## Preview
+
+![DigiStore Preview](./screenshots/preview.png)
+
 ## Features
 
 - **Auth:** register / login (bcrypt + JWT), live balance in navbar
