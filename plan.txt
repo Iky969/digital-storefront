@@ -1,0 +1,192 @@
+======================================================================
+MASTER EXECUTION PLAN: DIGITAL PRODUCTS STOREFRONT & E-WALLET SYSTEM
+======================================================================
+
+[OBJECTIVE]
+Build a complete, production-ready Full-Stack Web Application for selling digital goods (Premium Accounts, Game Currency, Vouchers) with an internal E-Wallet system, instant delivery, and simulated deposit gateway.
+
+----------------------------------------------------------------------
+1. PROJECT STRUCTURE & ENVIRONMENT SETUP
+----------------------------------------------------------------------
+Create a monorepo structure with two main directories: `/server` and `/client`.
+
+Root Files:
+- package.json (contain concurrent scripts: "npm start" to run both client and server)
+- .gitignore (include node_modules, dist, .env, *.db)
+
+Folder `/server`:
+- index.js (Express server entry point)
+- database.js (SQLite connection & schema initialization)
+- seed.js (Initial data populator)
+- middleware/auth.js (JWT verify middleware)
+- routes/auth.js
+- routes/products.js
+- routes/wallet.js
+- routes/buy.js
+- routes/admin.js
+
+Folder `/client`:
+- Vite + React setup with Tailwind CSS and Lucide React Icons
+- src/components/ (Navbar, Sidebar, ProductCard, DepositModal, Toast)
+- src/pages/ (Home, ProductDetail, Wallet, History, AdminDashboard, Login, Register)
+- src/context/AuthContext.jsx (Global user session & live balance state)
+- src/utils/api.js (Axios / Fetch helper with JWT header attachment)
+
+----------------------------------------------------------------------
+2. DATABASE SCHEMA (SQLite via better-sqlite3 or sqlite3)
+----------------------------------------------------------------------
+Initialize the following tables automatically on startup in `/server/database.js`:
+
+1. `users`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - username TEXT UNIQUE NOT NULL
+   - email TEXT UNIQUE NOT NULL
+   - password_hash TEXT NOT NULL
+   - balance INTEGER DEFAULT 0
+   - role TEXT DEFAULT 'user' ('user' | 'admin')
+   - created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
+2. `categories`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - name TEXT NOT NULL
+   - slug TEXT UNIQUE NOT NULL
+   - icon TEXT DEFAULT 'Package'
+
+3. `products`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - category_id INTEGER
+   - name TEXT NOT NULL
+   - description TEXT
+   - price INTEGER NOT NULL
+   - type TEXT NOT NULL ('account_credentials', 'voucher_code', 'game_topup')
+   - FOREIGN KEY (category_id) REFERENCES categories(id)
+
+4. `items_stock`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - product_id INTEGER NOT NULL
+   - content TEXT NOT NULL (e.g., "user:pass" or "VOUCHER-12345")
+   - is_sold BOOLEAN DEFAULT 0
+   - FOREIGN KEY (product_id) REFERENCES products(id)
+
+5. `deposits`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - user_id INTEGER NOT NULL
+   - amount INTEGER NOT NULL
+   - payment_method TEXT NOT NULL ('DANA', 'OVO', 'GoPay', 'QRIS')
+   - payment_code TEXT NOT NULL
+   - status TEXT DEFAULT 'pending' ('pending', 'success', 'cancelled')
+   - created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+   - FOREIGN KEY (user_id) REFERENCES users(id)
+
+6. `transactions`:
+   - id INTEGER PRIMARY KEY AUTOINCREMENT
+   - user_id INTEGER NOT NULL
+   - product_id INTEGER NOT NULL
+   - price INTEGER NOT NULL
+   - target_data TEXT (e.g., "User ID 12345678" for game topup, or null)
+   - delivered_content TEXT
+   - status TEXT DEFAULT 'completed' ('completed', 'failed')
+   - created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+   - FOREIGN KEY (user_id) REFERENCES users(id),
+   - FOREIGN KEY (product_id) REFERENCES products(id)
+
+----------------------------------------------------------------------
+3. BACKEND API ENDPOINTS & LOGIC (/server)
+----------------------------------------------------------------------
+Implement Express routes with proper error handling and status codes:
+
+A. Auth (`/api/auth`)
+- POST `/register`: Hash password (bcryptjs), create user, return JWT token + user obj.
+- POST `/login`: Verify credentials, return JWT token + user obj.
+- GET `/me`: Verify JWT, return current user profile + live balance.
+
+B. Catalog (`/api/products`)
+- GET `/`: Fetch all products with category details and calculated live stock count (`COUNT(items_stock WHERE is_sold = 0)`).
+- GET `/:id`: Fetch single product detail + stock status.
+
+C. E-Wallet System (`/api/wallet`)
+- POST `/deposit`: Create deposit record, generate simulated payment code/QR URL, set status='pending'.
+- POST `/deposit/confirm`: [CRITICAL] Wrap in SQLite Transaction:
+  1. Verify deposit status is 'pending'.
+  2. Update deposit status to 'success'.
+  3. Increase `users.balance` by `deposit.amount`.
+- GET `/history`: Return user's deposit logs and transaction logs.
+
+D. Purchase & Atomic Fulfillment (`/api/buy`)
+- POST `/`: [CRITICAL TRANSACTION LOGIC]
+  Wrap inside an atomic SQLite Transaction:
+  1. Check user exists and get current balance.
+  2. Get product price and verify `user.balance >= product.price`. Throw error if insufficient.
+  3. Query available stock item: `SELECT id, content FROM items_stock WHERE product_id = ? AND is_sold = 0 LIMIT 1`.
+     * Note: If product.type === 'game_topup', stock content can be "AUTO_FULFILLED".
+     * If no stock available, throw error "Out of stock".
+  4. Deduct balance: `UPDATE users SET balance = balance - ? WHERE id = ?`.
+  5. Mark item as sold: `UPDATE items_stock SET is_sold = 1 WHERE id = stock_item.id`.
+  6. Insert into `transactions`: Log `user_id`, `product_id`, `price`, `target_data`, `delivered_content` = stock_item.content, status = 'completed'.
+  7. Commit transaction and return JSON response: `{ success: true, delivered_content: stock_item.content, new_balance }`.
+
+E. Admin Panel (`/api/admin`) - Middleware restricted to role='admin'
+- POST `/products`: Create new product.
+- POST `/stock/bulk`: Insert multiple lines of credentials/vouchers into `items_stock`.
+- GET `/deposits/pending`: List all pending user deposits.
+- POST `/deposits/approve`: Force confirm deposit ID and credit user balance.
+
+----------------------------------------------------------------------
+4. FRONTEND INTERFACE & UI/UX (/client)
+----------------------------------------------------------------------
+Build using React, Tailwind CSS (Dark Mode Theme: Slate/Zinc 900 background, Cyan/Indigo accents).
+
+A. Header / Navbar
+- App Logo, Balance Pill Widget (Displays "Rp XXX.XXX" + Quick "+" Top Up Button), User Avatar Dropdown (History, Admin, Logout).
+
+B. Homepage
+- Hero Banner / Promo Carousel.
+- Category Filter Bar (All, Games, Premium Account, Streaming, Vouchers).
+- Product Grid: Cards showing Icon, Name, Price, Stock Badge (Green if >0, Red if Empty), and "Beli Direct" button.
+
+C. Order Modal / Detail Page
+- Product Info & Pricing.
+- Inputs for Game ID / Zone ID (shown dynamically if type === 'game_topup').
+- Price summary vs Current Wallet Balance.
+- Validation: If `balance < price`, show warning message + direct button "Top Up Saldo".
+- Instant Success Modal: Displays the delivered voucher code or credentials with a 1-click "COPY TO CLIPBOARD" button.
+
+D. E-Wallet Page
+- Quick amount selector (Rp 10k, 25k, 50k, 100k) + Custom input.
+- Payment Method Selector (DANA, OVO, GoPay, QRIS with logos).
+- Active Invoice Card: QR Code display / Payment Number + Countdown Timer + "Simulasi Bayar / Confirm" button for testing.
+
+E. History & Dashboard
+- Tab 1 "Pembelian Saya": List of bought items with date, price, target ID, and copyable content.
+- Tab 2 "Mutasi Saldo": Clear list of Cash-in (Deposits) and Cash-out (Purchases).
+
+F. Admin Panel UI
+- Simple Tabbed Interface:
+  1. Add Product Form.
+  2. Bulk Add Stock Form (Textarea to paste multiple "line-by-line" credentials).
+  3. Deposit Approval Table (List pending deposits with 1-click "Approve" button).
+
+----------------------------------------------------------------------
+5. SEED DATA REQUIREMENT (/server/seed.js)
+----------------------------------------------------------------------
+Automatically execute seed data on setup:
+- 1 Admin User (`admin` / `admin123`, balance: 1000000)
+- 1 Regular User (`user` / `user123`, balance: 50000)
+- 3 Categories: "Game Topup", "Streaming Premium", "Voucher"
+- 5 Products:
+  1. Mobile Legends 86 Diamonds (Rp 20.000, type: game_topup)
+  2. Netflix Premium 1 Bulan (Rp 45.000, type: account_credentials)
+  3. Spotify Individual 1 Bulan (Rp 30.000, type: account_credentials)
+  4. Google Play Voucher 50k (Rp 52.000, type: voucher_code)
+  5. Valorant 1000 VP (Rp 110.000, type: game_topup)
+- Insert 5 sample stock items for Netflix, Spotify, and Google Play.
+
+----------------------------------------------------------------------
+6. EXECUTION RULES FOR CLI AGENT
+----------------------------------------------------------------------
+- DO NOT read or execute any other files like `prompt.txt`.
+- Output CLEAN, fully functional code without placeholder comments like `// TODO: implement this`.
+- Ensure CORS and JSON parsing middlewares are enabled on Express.
+- Ensure Vite is properly configured to proxy `/api` requests to `http://localhost:5000`.
+======================================================================
+

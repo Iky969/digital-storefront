@@ -1,0 +1,7 @@
+Tolong lakukan tugas otomatisasi ini:
+1. Jalankan aplikasi (npm start atau jalankan server & client).
+2. Pakai Puppeteer/Playwright atau CLI tool screenshot untuk mengambil gambar halaman utama web (http://localhost:3000 atau port client).
+3. Simpan gambar screenshot ke folder `./screenshots/preview.png`.
+4. Update `README.md` agar menampilkan gambar `./screenshots/preview.png` di bagian atas.
+5. Lakukan `git add .`, `git commit -m "feat: auto generate preview screenshot and push project"`, lalu `git push origin main`.
+

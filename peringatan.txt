@@ -1,0 +1,19 @@
+[TIME CRITICAL: MAXIMUM 30 MINUTES REMAINING]
+
+Kamu punya batas waktu KETAT 30 menit dari sekarang sebelum sesi ini berakhir secara otomatis. 
+
+IKUTI STRATEGI EMERGENSI BERIKUT:
+1. PRIORITAS UTAMA (Fokus 20 Menit Pertama):
+   - Selesaikan pembuatan seluruh skrip backend (`/server`): index.js, database.js (SQLite schema), seed.js, serta semua endpoint Auth, Product, Wallet Deposit, dan Buy.
+   - Buat file frontend utama (`/client`): App.jsx dan komponen utama untuk Katalog, Modal Deposit, dan Order.
+
+2. BUNGKUS HASIL & STATUS (10 Menit Terakhir):
+   - SEGERA BERHENTI melakukan coding tambahan.
+   - Buat file `PROGRESS.txt` di root directory. Isinya:
+     * [BERHASIL] List file dan fitur yang sudah selesai dibuat secara penuh.
+     * [PENDING] List file/fitur yang belum sempat dibuat atau butuh penyempurnaan.
+     * [NEXT STEPS] Instruksi singkat apa yang harus dilanjutkan oleh developer/agent berikutnya (Codex).
+   - Buat/perbarui `README.md` dengan panduan cara menjalankan server dan client yang sudah ada.
+
+LANGSUNG EKSEKUSI KODE DENGAN CEPAT TANPA BANYAK PENJELASAN TEKS!
+
